@@ -1,0 +1,2 @@
+width: 1004, height: 1118, color-type: Rgb, bit-depth: Eight
+Red: [31mREDDDD[0m
