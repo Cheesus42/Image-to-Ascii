@@ -1,33 +1,48 @@
+use std::env;
 use std::fs::File;
 use std::io::BufReader;
 
 use ansi_term;
-use png;
+use png::{self, OutputInfo};
 use termsize;
 
 //const BRIGHTNESS: &[u8; 70] = b"$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
-const BRIGHTNESS: &[u8] = b" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+const BRIGHTNESS: &[u8] =
+    b" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
-fn to_ascii(f: File) {
+fn extract_png(f: File) -> (Vec<[u8; 4]>, OutputInfo) {
     let mut reader = png::Decoder::new(BufReader::new(f)).read_info().unwrap();
     let mut buf = vec![0; reader.output_buffer_size().unwrap()];
     let info = reader.next_frame(&mut buf).unwrap();
     let bytes = &buf[..info.buffer_size()];
-    
+
     let pixels: Vec<[u8; 4]> = match info.color_type {
-        png::ColorType::Rgb => bytes.chunks_exact(3).map(|byte| [byte[0], byte[1], byte[2], 255]).collect(),
-        png::ColorType::Rgba => bytes.chunks_exact(4).map(|byte| [byte[0], byte[1], byte[2], byte[3]]).collect(),
+        png::ColorType::Rgb => bytes
+            .chunks_exact(3)
+            .map(|byte| [byte[0], byte[1], byte[2], 255])
+            .collect(),
+        png::ColorType::Rgba => bytes
+            .chunks_exact(4)
+            .map(|byte| [byte[0], byte[1], byte[2], byte[3]])
+            .collect(),
         png::ColorType::Grayscale => bytes.iter().map(|&byte| [byte, byte, byte, 255]).collect(),
-        png::ColorType::GrayscaleAlpha => bytes.chunks_exact(2).map(|byte| [byte[0], byte[0], byte[0], byte[1]]).collect(),
-        png::ColorType::Indexed => panic!("indexed color-type is not supported")
+        png::ColorType::GrayscaleAlpha => bytes
+            .chunks_exact(2)
+            .map(|byte| [byte[0], byte[0], byte[0], byte[1]])
+            .collect(),
+        png::ColorType::Indexed => panic!("indexed color-type is not supported"),
     };
-    
+    return (pixels, info);
+}
+
+fn to_ascii(f: File) {
+    let (pixels, info) = extract_png(f);
     //get terminal width
     let term_size = termsize::get().unwrap_or(termsize::Size { rows: 0, cols: 50 });
     //determine ratio
-    let ratio = (info.width as f32 / info.height as f32) * 2.0;
+    let ratio = (info.width as f32 / info.height as f32) * 3.5;
     let h_pixels_per_char = (info.width as f32 / term_size.cols as f32).floor() as usize;
-    let v_pixels_per_char = (h_pixels_per_char as f32 * ratio ).floor().max(1.0) as u32;
+    let v_pixels_per_char = (h_pixels_per_char as f32 * ratio).floor().max(1.0) as u32;
     let rows = info.height as usize / v_pixels_per_char as usize;
     for dy in 0..rows {
         for dx in 0..term_size.cols as usize {
@@ -60,15 +75,19 @@ fn to_ascii(f: File) {
         println!();
     }
 
-println!(
-        "width: {}, height: {}, color-type: {:?}, bit-depth: {:?}",
+    println!(
+        "width: {}px,\nheight: {}px,\ncolor-type: {:?},\nbit-depth: {:?}",
         info.width, info.height, info.color_type, info.bit_depth
     );
 }
 
-
 fn main() {
-    let file = File::open("test4.png");
-    to_ascii(file.unwrap());
-    println!("Red: {}", ansi_term::Colour::Red.paint("REDDDD"));
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("Please enter a filepath")
+    } else {
+        let path = &args[1].clone();
+        let file = File::open(path);
+        to_ascii(file.unwrap());
+    }
 }
