@@ -1,4 +1,4 @@
-use std::env;
+use std::env::{self, args};
 use std::fs::File;
 use std::io::BufReader;
 
@@ -35,12 +35,12 @@ fn extract_png(f: File) -> (Vec<[u8; 4]>, OutputInfo) {
     return (pixels, info);
 }
 
-fn to_ascii(f: File) {
+fn to_ascii(f: File, aspect_ratio_mod: f32) {
     let (pixels, info) = extract_png(f);
     //get terminal width
     let term_size = termsize::get().unwrap_or(termsize::Size { rows: 0, cols: 50 });
     //determine ratio
-    let ratio = (info.width as f32 / info.height as f32) * 3.5;
+    let ratio = (info.width as f32 / info.height as f32) * aspect_ratio_mod;
     let h_pixels_per_char = (info.width as f32 / term_size.cols as f32).floor() as usize;
     let v_pixels_per_char = (h_pixels_per_char as f32 * ratio).floor().max(1.0) as u32;
     let rows = info.height as usize / v_pixels_per_char as usize;
@@ -85,9 +85,14 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         println!("Please enter a filepath")
-    } else {
+    } else if args.len() < 3 {
         let path = &args[1].clone();
         let file = File::open(path);
-        to_ascii(file.unwrap());
+        to_ascii(file.unwrap(), 2.0);
+    } else {
+        let path = &args[1].clone();
+        let aspect_ratio: &f32 = &args[2].clone().parse().unwrap_or(2.0);
+        let file = File::open(path);
+        to_ascii(file.unwrap(), *aspect_ratio);
     }
 }
